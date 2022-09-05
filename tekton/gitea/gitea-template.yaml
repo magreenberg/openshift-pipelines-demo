@@ -1,0 +1,45 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: gitea-template
+spec:
+  params:
+  - name: gitrevision
+    description: The git revision
+    default: main
+  - name: source-gitrepositoryurl
+    description: The git repository url for the application code
+  - name: deploy-gitrepositoryurl
+    description: The git repository url for the deployment directives
+  - name: repository-name
+    description: The name of the repository
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: ci-
+    spec:
+      serviceAccountName: build-bot
+      pipelineRef:
+        name: ci
+      params:
+        - name: url
+          value: $(tt.params.source-gitrepositoryurl)
+        - name: gitrevision
+          value: $(tt.params.gitrevision)
+        - name: cd-url
+          value: $(tt.params.deploy-gitrepositoryurl)
+        - name: image
+          value: image-registry.openshift-image-registry.svc:5000/cicd/$(tt.params.repository-name)
+        # next variable should be part of CD pipeline. It is here for demo purposes only
+        - name: release-name
+          value: $(tt.params.repository-name)
+      workspaces:
+        - name: shared-data
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 5Gi

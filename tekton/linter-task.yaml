@@ -1,0 +1,18 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: linter
+spec:
+  steps:
+    - name: super-linter
+      image: docker.io/github/super-linter:slim-v4
+      env:
+      - name: RUN_LOCAL
+        value: "true"
+      - name: USE_FIND_ALGORITHM
+        value: "true"
+      - name: VALIDATE_JAVA
+        value: "false"
+  workspaces:
+    - name: source
+      mountPath: /tmp/lint

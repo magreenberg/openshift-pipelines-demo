@@ -1,0 +1,20 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: gitea-eventlistener
+spec:
+  triggers:
+    - name: pipeline-ci
+      serviceAccountName: build-bot
+      interceptors:
+        - ref:
+            name: "cel"
+          params:
+            - name: "overlays"
+              value:
+                - key: "repository-name"
+                  expression: "body.repository.html_url.split('/')[size(body.repository.html_url.split('/'))-1]"
+      bindings:
+        - ref: gitea-binding
+      template:
+        ref: gitea-template

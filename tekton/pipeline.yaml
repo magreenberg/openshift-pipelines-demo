@@ -1,0 +1,79 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  workspaces:
+    - name: shared-data
+  params:
+  - name: url
+    type: string
+  - name: cd-url
+    type: string
+  - name: image
+    type: string
+  - name: release-name
+    type: string
+  tasks:
+  - name: clone-sources
+    taskRef:
+      kind: ClusterTask
+      name: git-clone
+    params:
+      - name: url
+        value: $(params.url)
+    workspaces:
+      - name: output
+        workspace: shared-data
+  - name: linter
+    taskRef:
+      kind: Task
+      name: linter
+    workspaces:
+      - name: source
+        workspace: shared-data
+    runAfter:
+      - clone-sources
+  - name: build-and-push
+    taskRef:
+      kind: ClusterTask
+      name: buildah
+    params:
+      - name: IMAGE
+        value: $(params.image):$(tasks.clone-sources.results.commit)
+    workspaces:
+      - name: source
+        workspace: shared-data
+    runAfter:
+      - clone-sources
+  - name: update-deployment-repo
+    taskRef:
+      kind: ClusterTask
+      name: git-cli
+    params:
+      - name: GIT_USER_NAME
+        value: demo
+      - name: GIT_SCRIPT
+        value: "set -x; GIT_TRACE=2 GIT_CURL_VERBOSE=2 git clone $(params.cd-url) cd-repo;cd cd-repo;sed -i \"s@repositoryandtag:.*@repositoryandtag: $(params.image):$(tasks.clone-sources.results.commit)@\" values.yaml;git commit -a -m \"updated image tag\" --allow-empty;GIT_TRACE=2 GIT_CURL_VERBOSE=2 git push"
+    workspaces:
+      - name: source
+        workspace: shared-data
+    runAfter:
+      - build-and-push
+      - linter
+  - name: deploy-application
+    taskRef:
+      kind: ClusterTask
+      name: helm-upgrade-from-source
+    params:
+      - name: charts_dir
+        value: cd-repo
+      - name: release_namespace
+        value: cicd
+      - name: release_name
+        value: "$(params.release-name)"
+    workspaces:
+      - name: source
+        workspace: shared-data
+    runAfter:
+      - update-deployment-repo

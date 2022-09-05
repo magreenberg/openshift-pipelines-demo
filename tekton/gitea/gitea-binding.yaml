@@ -1,0 +1,14 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: gitea-binding
+spec:
+  params:
+  - name: gitrevision
+    value: $(body.head_commit.id)
+  - name: source-gitrepositoryurl
+    value: $(body.repository.clone_url)
+  - name: repository-name
+    value: $(extensions.repository-name)
+  - name: deploy-gitrepositoryurl
+    value: "$(body.repository.html_url)-cd.git"
