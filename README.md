@@ -16,7 +16,7 @@ oc adm policy add-scc-to-user nonroot -z gitea-memcached
 ```
 Use `helm` to install `gitea`:
 ```bash
-helm install gitea gitea-charts/gitea --set ingress.hosts[0].host=gitea-http-gitea$(oc whoami --show-console | sed "s/.*console-openshift-console//") --set gitea.config.webhook.ALLOWED_HOST_LIST='*' --set gitea.config.webhook.SKIP_TLS_VERIFY=true
+helm install gitea gitea-charts/gitea --set ingress.hosts[0].host=gitea-http-gitea$(oc whoami --show-console | sed "s/.*console-openshift-console//") --set gitea.config.webhook.ALLOWED_HOST_LIST='*' --set gitea.config.webhook.SKIP_TLS_VERIFY=true --set image.pullPolicy=IfNotPresent
 ```
 Create a `route` for `gitea`:
 ```bash
@@ -61,7 +61,7 @@ kind: Secret
 metadata:
   name: gitea-credentials
   annotations:
-    tekton.dev/git-0: gitea-http-gitea$(oc whoami --show-console | sed "s/.*console-openshift-console//")
+    tekton.dev/git-0: http://gitea-http-gitea$(oc whoami --show-console | sed "s/.*console-openshift-console//")
 type: kubernetes.io/basic-auth
 stringData:
   username: demo
