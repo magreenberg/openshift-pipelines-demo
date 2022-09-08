@@ -1,7 +1,7 @@
 # OpenShift Pipelines Demo
 This repository has all the files needed to set up a self-contained OpenShift Pipelines demonstration in a single OpenShift cluster.
 # OpenShift Pipelines Installation
-Install OpenShift Pipelines via Operators Hub.
+Install `Red Hat OpenShift Pipelines` via the web interface at Administrator->Operators->Operators Hub->OperatorHub. Use the default configuration values.
 
 # Install gitea
 `gitea` is used as the `git` repository for this demo. Install it by running the following commands in a `bash` shell:
@@ -23,18 +23,22 @@ Create a `route` for `gitea`:
 oc expose service gitea-http
 oc get route gitea-http -o jsonpath='{"http://"}{.status.ingress[0].host}{"\n"}'
 ```
-Browse the the URL displayed above and sign into `gitea` using the following credentials:
+When all pods are in the `Running` status, browse the the URL displayed above and sign into `gitea` using the following credentials:
 * user: gitea_admin
 * password: r8sA8CPHD9!bt6d
 
-In `gitea` create a user named `demo` with password `demodemo`.
+In `gitea` press the pull-down icon at the top right and select `Site Administration`. In the `User Accounts` tab press `Create User Account` and create a user named `demo` with password `demodemo`. Deselect `Require user to change password`.
 
 # Set up Git repository
-Sign into `gitea` using the `demo` account and create two repositories:
-* httpserver
-* httpserver-cd
+* `Sign Out` of `gitea` and then log in using the `demo` account created above. Create a repository named `httpserver`.
+* Copy the `httpserver` directory from this repository to a new location.
+* In the copied directory run the instructions provided by `gitea` for creating a new repository with the following changes.
+  * Instead of `git add README.md` use `git add .`
+  * At this time, the `gitea` instructions state `git push -u origin master`. Replace this with `git push -u origin main`.
+* During the `git push` step you will be prompted for the user and password (demo/demodemo).
 
-Follow the `gitea` instructions to add the code from the `httpserver` and `httpserver-cd` directories to the `gitea` repositories.
+Repeat the above steps for a repository named `httpserver-cd`.
+
 
 # Create a project/namespace for OpenShift Pipelines
 
@@ -44,14 +48,14 @@ oc new-project cicd
 ```
 Create the OpenShift Pipeline for this demo by running:
 ```bash
-oc create -f tekton/linter-task.yaml
-oc create -f tekton/pipeline.yaml
+oc create -n cicd -f tekton/linter-task.yaml
+oc create -n cicd -f tekton/pipeline.yaml
 ```
 
 # Create a Secret for Gitea
 Create a secret for Gitea by running the following:
 ```bash
-oc create -f - <<EOF
+oc create -n cicd -f - <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -68,7 +72,7 @@ EOF
 # Create a ServiceAccount
 Create a ServiceAccount for the OpenShift Pipelines builder as follows:
 ```bash
-oc create -f - <<EOF
+oc create -n cicd -f - <<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -79,19 +83,27 @@ EOF
 ```
 Add a CluterRole binding for the builder ServiceAccount (not recommended for production clusters):
 ```bash
+oc adm policy add-cluster-role-to-user tekton-triggers-eventlistener-clusterroles system:serviceaccount:cicd:build-bot
+oc adm policy add-role-to-user tekton-triggers-eventlistener-roles system:serviceaccount:cicd:build-bot
+```
+Temporarily apply this hack (not on production systems). This will be resolved in the future:
+```
 oc adm policy add-cluster-role-to-user cluster-admin -z build-bot
 ```
 
 # Create an EventListener
 Create an OpenShift Pipelines EventListener for this demo by running:
 ```bash
-oc create -f tekton/gitea-binding.yaml
-oc create -f tekton/gitea-template.yaml
-oc create -f tekton/gitea-eventlistener.yaml
+oc create -n cicd -f tekton/gitea/gitea-binding.yaml
+oc create -n cicd -f tekton/gitea/gitea-template.yaml
+oc create -n cicd -f tekton/gitea/gitea-eventlistener.yaml
 ```
 # Create a Gitea Webhook
-In `gitea` select the `Settings` tab and in `Webhooks` create a webhook with target URL:
+Browse to the `gitea` `httpserver` repository, select the `Settings` tab and in `Webhooks` press `Add Webhook`. Create a `Gitea` webhook with target URL:
 ```
 http://el-gitea-eventlistener.cicd.svc.cluster.local:8080
 ```
 (Note that this URL works for this demo as `gitea` is running in the same cluster as the OpenShift Pipelines event listener.)
+
+# Test it Out
+In the `httpserver` repository, update a file, commit and push the changes.
